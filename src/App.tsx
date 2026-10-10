@@ -28,11 +28,22 @@ interface SignInValues {
   password: string;
 }
 
+interface SignUpValues {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+}
+
 function SignIn({
   onSignIn,
+  onCreateAccount,
+  onError,
   notice,
 }: {
   onSignIn: (session: AuthSession) => void;
+  onCreateAccount: () => void;
+  onError: (message: string) => void;
   notice?: string;
 }) {
   const [error, setError] = useState(notice ?? '');
@@ -41,7 +52,7 @@ function SignIn({
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<SignInValues>({
-    defaultValues: { email: isDemoMode ? 'demo@pipelinecrm.com' : '', password: '' },
+    defaultValues: { email: isDemoMode ? '' : '', password: '' },
   });
   const navigate = useNavigate();
 
@@ -51,7 +62,7 @@ function SignIn({
       onSignIn(await crmApi.login(values.email, values.password));
       navigate('/dashboard');
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to sign in.');
+      onError(reason instanceof Error ? reason.message : 'Unable to sign in.');
     }
   }
 
@@ -134,14 +145,11 @@ function SignIn({
                 <small className="form-field-error">{errors.password.message}</small>
               )}
             </label>
-            <div className="login-meta">
+            {/* <div className="login-meta">
               <label>
                 <input type="checkbox" defaultChecked /> Remember me
               </label>
-              <button type="button" className="text-button">
-                Forgot password?
-              </button>
-            </div>
+            </div> */}
             <button
               className="button button-primary login-button"
               type="submit"
@@ -151,12 +159,18 @@ function SignIn({
               <Icon name="chevron" size={16} />
             </button>
           </form>
+          <div className="auth-switch">
+            New here?
+            <button type="button" className="text-button" onClick={onCreateAccount}>
+              Create an account
+            </button>
+          </div>
           {isDemoMode && (
             <div className="demo-login-note">
               <Icon name="sparkles" size={15} />
               <span>
-                <b>Exploring the demo?</b>
-                <small>Use any email and password to access the sample workspace.</small>
+                <b>New to the demo?</b>
+                <small>Create an account first, then sign in with your registered email and password.</small>
               </span>
             </div>
           )}
@@ -168,6 +182,188 @@ function SignIn({
           © 2026 Pipeline CRM <span>·</span> Built for better relationships
         </div>
       </section>
+    </main>
+  );
+}
+
+function SignUp({
+  onBackToSignIn,
+  notice,
+}: {
+  onBackToSignIn: () => void;
+  notice?: string;
+}) {
+  const [error, setError] = useState(notice ?? '');
+  const [accountCreated, setAccountCreated] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<SignUpValues>({
+    defaultValues: {
+      name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    },
+  });
+  async function submit(values: SignUpValues) {
+    setError('');
+    if (values.password !== values.confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    try {
+      await crmApi.signup(values.name.trim(), values.email, values.password);
+      setAccountCreated(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to create account.');
+    }
+  }
+
+  return (
+    <main className="login-page">
+      <section className="login-art">
+        <div className="login-brand">
+          <span className="brand-symbol">p</span> pipeline<span className="brand-crm">crm</span>
+        </div>
+        <div className="login-art-copy">
+          <span className="eyebrow">BUILD BETTER RELATIONSHIPS</span>
+          <h1>
+            Start your
+            <br />
+            next sales chapter.
+          </h1>
+          <p>Turn conversations into momentum with context, focus, and a clear path to the next step.</p>
+          <div className="login-art-stats">
+            <div>
+              <b>5 min</b>
+              <small>to launch</small>
+            </div>
+            <span />
+            <div>
+              <b>99.9%</b>
+              <small>less chaos</small>
+            </div>
+            <span />
+            <div>
+              <b>1 team</b>
+              <small>one workspace</small>
+            </div>
+          </div>
+        </div>
+        <div className="login-art-glow" />
+        <small className="login-art-foot">A little more clarity in every sales day.</small>
+      </section>
+      <section className="login-form-side">
+        <div className="login-form-wrap">
+          <span className="eyebrow">CREATE ACCOUNT</span>
+          <h2>Set up your workspace</h2>
+          <p>Get started with a CRM built for faster follow-up and stronger pipeline visibility.</p>
+          {error && (
+            <div className="form-error" role="alert">
+              {error}
+            </div>
+          )}
+          <form noValidate onSubmit={handleSubmit(submit)}>
+            <label className="field">
+              Full name
+              <input
+                type="text"
+                autoComplete="name"
+                placeholder="Jordan Lee"
+                {...register('name', { required: 'Enter your full name.' })}
+              />
+              {errors.name && <small className="form-field-error">{errors.name.message}</small>}
+            </label>
+            <label className="field">
+              Work email
+              <input
+                type="email"
+                autoComplete="username"
+                placeholder="you@company.com"
+                {...register('email', {
+                  required: 'Email is required field',
+                  pattern: {
+                    value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                    message: 'Enter a valid email address.',
+                  },
+                })}
+              />
+              {errors.email && <small className="form-field-error">{errors.email.message}</small>}
+            </label>
+            <label className="field">
+              Password
+              <input
+                type="password"
+                autoComplete="new-password"
+                placeholder="Create a password"
+                {...register('password', {
+                  required: 'Create a password.',
+                  minLength: {
+                    value: isDemoMode ? 1 : 8,
+                    message: `Password must be at least ${isDemoMode ? 1 : 8} characters.`,
+                  },
+                })}
+              />
+              {errors.password && (
+                <small className="form-field-error">{errors.password.message}</small>
+              )}
+            </label>
+            <label className="field">
+              Confirm password
+              <input
+                type="password"
+                autoComplete="new-password"
+                placeholder="Confirm your password"
+                {...register('confirmPassword', {
+                  required: 'Please confirm your password.',
+                })}
+              />
+              {errors.confirmPassword && (
+                <small className="form-field-error">{errors.confirmPassword.message}</small>
+              )}
+            </label>
+            <button
+              className="button button-primary login-button"
+              type="submit"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Creating account...' : 'Create account'}
+              <Icon name="chevron" size={16} />
+            </button>
+          </form>
+          <div className="auth-switch">
+            Already have an account?
+            <button type="button" className="text-button" onClick={onBackToSignIn}>
+              Sign in
+            </button>
+          </div>
+          <small className="login-terms">
+            By continuing, you agree to our Terms of Service and Privacy Policy.
+          </small>
+        </div>
+        <div className="login-footer">
+          © 2026 Pipeline CRM <span>·</span> Built for better relationships
+        </div>
+      </section>
+      {accountCreated && (
+        <div className="modal-backdrop">
+          <section
+            className="modal-card signup-success-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="signup-success-title"
+          >
+            <span className="eyebrow">SIGN-UP COMPLETE</span>
+            <h2 id="signup-success-title">Your account was created successfully.</h2>
+            <p>You can now sign in using the email and password you registered.</p>
+            <button className="button button-primary" type="button" onClick={onBackToSignIn}>
+              Sign in
+            </button>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
@@ -421,6 +617,7 @@ function AppRoutes() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [toast, setToast] = useState<{ message: string; kind: 'success' | 'error' }>();
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
 
   const reload = useCallback(async () => {
     try {
@@ -498,7 +695,19 @@ function AppRoutes() {
   if (!session)
     return (
       <>
-        <SignIn onSignIn={setSession} notice={loadError} />
+        {authMode === 'signup' ? (
+          <SignUp
+            onBackToSignIn={() => setAuthMode('signin')}
+            notice={loadError}
+          />
+        ) : (
+          <SignIn
+            onSignIn={setSession}
+            onCreateAccount={() => setAuthMode('signup')}
+            onError={(message) => setToast({ message, kind: 'error' })}
+            notice={loadError}
+          />
+        )}
         {toast && (
           <div className={`toast ${toast.kind}`} role="status">
             {toast.message}

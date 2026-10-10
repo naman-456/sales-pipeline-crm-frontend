@@ -1780,6 +1780,24 @@ p {
   border-radius: 14px;
   box-shadow: 0 18px 55px #191a3233;
 }
+.signup-success-modal {
+  width: min(420px, 100%);
+  text-align: center;
+}
+.signup-success-modal h2 {
+  margin: 8px 0;
+  color: #303246;
+  font-size: 19px;
+}
+.signup-success-modal p {
+  margin-bottom: 20px;
+  color: #858799;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.signup-success-modal .button {
+  min-width: 120px;
+}
 .modal-heading {
   display: flex;
   align-items: flex-start;
@@ -2366,6 +2384,19 @@ p {
   accent-color: #725fe8;
 }
 .login-meta .text-button {
+  font-size: 9px;
+}
+.auth-switch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 18px;
+  color: #7d8191;
+  font-size: 9px;
+}
+.auth-switch .text-button {
+  padding: 0;
   font-size: 9px;
 }
 .login-button {

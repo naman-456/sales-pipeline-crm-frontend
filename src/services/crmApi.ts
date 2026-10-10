@@ -16,8 +16,16 @@ import type {
 const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
 console.log("API Url :", API_URL)
 const STORAGE_KEY = 'pipeline-crm-demo-data';
+const DEMO_ACCOUNTS_KEY = 'pipeline-crm-demo-accounts';
 const TOKEN_KEY = 'pipeline-crm-token';
 const USER_KEY = 'pipeline-crm-user';
+
+interface DemoAccount {
+  name: string;
+  email: string;
+  salt: string;
+  passwordHash: string;
+}
 
 interface MockState {
   contacts: Contact[];
@@ -58,6 +66,28 @@ function saveMockState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(mockState));
 }
 
+function persistSession(session: AuthSession) {
+  token = session.token;
+  localStorage.setItem(TOKEN_KEY, session.token);
+  localStorage.setItem(USER_KEY, JSON.stringify(session.user));
+}
+
+function readDemoAccounts(): Record<string, DemoAccount> {
+  const raw = localStorage.getItem(DEMO_ACCOUNTS_KEY);
+  if (!raw) return {};
+  return JSON.parse(raw) as Record<string, DemoAccount>;
+}
+
+function encodeHex(bytes: Uint8Array) {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function hashPassword(password: string, salt: string) {
+  const data = new TextEncoder().encode(`${salt}:${password}`);
+  const hash = await globalThis.crypto.subtle.digest('SHA-256', data);
+  return encodeHex(new Uint8Array(hash));
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!API_URL) throw new Error('Set VITE_API_URL to connect to the CRM API.');
   const response = await fetch(`${API_URL}${path}`, {
@@ -93,26 +123,49 @@ export const crmApi = {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
-      token = session.token;
-      localStorage.setItem(TOKEN_KEY, session.token);
-      localStorage.setItem(USER_KEY, JSON.stringify(session.user));
+      persistSession(session);
       return session;
     }
     if (!email.trim() || !password.trim()) throw new Error('Enter your email and password.');
-    const user: User = {
-      id: 'demo-user',
-      name: email
-        .split('@')[0]
-        .replace(/[._-]/g, ' ')
-        .replace(/\b\w/g, (letter) => letter.toUpperCase()),
-      email,
-      role: 'Sales representative',
+    const normalizedEmail = email.trim().toLowerCase();
+    const account = readDemoAccounts()[normalizedEmail];
+    if (!account) throw new Error('Account not found. Please sign up first.');
+    if ((await hashPassword(password, account.salt)) !== account.passwordHash)
+      throw new Error('Password incorrect');
+    const session = {
+      token: `demo-session-${createId('token')}`,
+      user: {
+        id: `demo-user-${normalizedEmail}`,
+        name: account.name,
+        email: account.email,
+        role: 'Sales representative',
+      },
     };
-    const session = { token: 'demo-session', user };
-    token = session.token;
-    localStorage.setItem(TOKEN_KEY, session.token);
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    persistSession(session);
     return session;
+  },
+
+  async signup(name: string, email: string, password: string): Promise<void> {
+    if (API_URL) {
+      await request<unknown>('/api/auth/signup', {
+        method: 'POST',
+        body: JSON.stringify({ name, email, password }),
+      });
+      return;
+    }
+    if (!name.trim()) throw new Error('Enter your full name.');
+    if (!email.trim() || !password.trim()) throw new Error('Enter your email and password.');
+    const normalizedEmail = email.trim().toLowerCase();
+    const accounts = readDemoAccounts();
+    if (accounts[normalizedEmail]) throw new Error('An account with this email already exists.');
+    const salt = encodeHex(globalThis.crypto.getRandomValues(new Uint8Array(16)));
+    accounts[normalizedEmail] = {
+      name: name.trim(),
+      email: email.trim(),
+      salt,
+      passwordHash: await hashPassword(password, salt),
+    };
+    localStorage.setItem(DEMO_ACCOUNTS_KEY, JSON.stringify(accounts));
   },
 
   async restoreSession(): Promise<AuthSession | null> {
